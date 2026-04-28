@@ -1,0 +1,295 @@
+/**
+ * ui_components.html - Web UI Components for Image Processing
+ * 
+ * Provides modular UI components for:
+ * - Image upload widget
+ * - Path preview canvas
+ * - Preview statistics display
+ * 
+ * Integration notes:
+ * - Add to existing web_server.cpp HTML page
+ * - Canvas requires Chart.js or custom SVG rendering
+ * - Stats auto-update with WebSocket or polling
+ */
+
+<!-- Image Upload Widget -->
+<div id="image-upload-widget" class="control-group">
+  <h3>Image Upload</h3>
+  <div class="upload-area">
+    <input type="file" id="image-file-input" accept="image/png,image/jpeg,image/jpg,image/svg+xml" />
+    <button onclick="uploadImage()">Upload & Process</button>
+    <div id="upload-status" style="margin-top: 10px; color: #666; font-size: 0.9em;"></div>
+  </div>
+</div>
+
+<!-- Mode Selector -->
+<div id="mode-selector" class="control-group" style="display:none;">
+  <h3>Processing Mode</h3>
+  <select id="preset-mode-select" onchange="updatePreset()">
+    <option value="">-- Default --</option>
+    <option value="logo">Logo Mode (Clean, simplified)</option>
+    <option value="signature">Signature Mode (Detail-preserving)</option>
+    <option value="fine-art">Fine-Art Mode (High density)</option>
+    <option value="outline">Outline Mode (Simple contours)</option>
+  </select>
+</div>
+
+<!-- Parameter Controls -->
+<div id="parameter-controls" class="control-group" style="display:none;">
+  <h3>Fine-Tune Parameters</h3>
+  <div>
+    <label>Simplification Tolerance (mm):</label>
+    <input type="number" id="simplify-tolerance" value="0.5" min="0.1" max="5.0" step="0.1" />
+  </div>
+  <div>
+    <label>Min Path Length (mm):</label>
+    <input type="number" id="min-path-length" value="0.5" min="0.1" max="10.0" step="0.1" />
+  </div>
+  <div>
+    <label>Min Point Distance (mm):</label>
+    <input type="number" id="min-point-distance" value="0.1" min="0.01" max="1.0" step="0.05" />
+  </div>
+  <button onclick="updateParameters()">Apply Parameters</button>
+</div>
+
+<!-- Path Preview Canvas -->
+<div id="preview-canvas-widget" class="control-group" style="display:none;">
+  <h3>Path Preview</h3>
+  <div id="preview-container" style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: #fafafa;">
+    <svg id="preview-svg" width="400" height="400" style="border: 1px solid #ccc; background: white;">
+      <rect width="400" height="400" fill="white"/>
+      <text x="200" y="200" text-anchor="middle" fill="#ccc">No image processed yet</text>
+    </svg>
+  </div>
+</div>
+
+<!-- Preview Statistics -->
+<div id="preview-stats" class="control-group" style="display:none;">
+  <h3>Processing Statistics</h3>
+  <div id="stats-display" class="gcode-info">
+    <div>Paths detected: <strong id="stat-path-count">0</strong></div>
+    <div>Total points: <strong id="stat-point-count">0</strong></div>
+    <div>Total length: <strong id="stat-length">0</strong> mm</div>
+    <div>Closed paths: <strong id="stat-closed">0</strong></div>
+    <div>Open paths: <strong id="stat-open">0</strong></div>
+    <div>Point reduction: <strong id="stat-reduction">0</strong>%</div>
+  </div>
+</div>
+
+<!-- Workflow Control -->
+<div id="workflow-button" class="control-group" style="display:none;">
+  <h3>Workflow</h3>
+  <button class="gcode-btn" onclick="previewPaths()">Preview Paths</button>
+  <button class="gcode-btn" onclick="convertToGCode()">Convert to G-Code</button>
+  <button class="gcode-btn" onclick="downloadGCode()">Download G-Code</button>
+</div>
+
+<style>
+#image-upload-widget .upload-area {
+  border: 2px dashed #667eea;
+  padding: 20px;
+  text-align: center;
+  border-radius: 8px;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+#preset-mode-select, 
+#simplify-tolerance, 
+#min-path-length, 
+#min-point-distance {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  margin: 5px 0;
+  width: 100%;
+  max-width: 300px;
+}
+
+#preset-mode-select:focus,
+input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+#preview-container {
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  max-height: 450px;
+}
+
+#preview-svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.gcode-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gcode-info div {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+}
+</style>
+
+<script>
+// Image Upload Handler
+function uploadImage() {
+  const fileInput = document.getElementById('image-file-input');
+  const file = fileInput.files[0];
+  if (!file) {
+    alert('Please select an image file');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const statusDiv = document.getElementById('upload-status');
+  statusDiv.textContent = 'Processing...';
+
+  fetch('/api/process-image', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      statusDiv.textContent = '✓ ' + data.message;
+      
+      // Show other panels
+      document.getElementById('mode-selector').style.display = 'block';
+      document.getElementById('preview-canvas-widget').style.display = 'block';
+      document.getElementById('preview-stats').style.display = 'block';
+      document.getElementById('workflow-button').style.display = 'block';
+      document.getElementById('parameter-controls').style.display = 'block';
+      
+      // Update stats
+      updateStatsDisplay(data.data);
+      
+      // Draw preview
+      drawPreview(data.data);
+    } else {
+      statusDiv.textContent = '✗ Error: ' + data.error;
+    }
+  })
+  .catch(err => {
+    statusDiv.textContent = '✗ Failed: ' + err.message;
+  });
+}
+
+function updatePreset() {
+  const mode = document.getElementById('preset-mode-select').value;
+  if (!mode) return;
+
+  // Preset configurations
+  const presets = {
+    'logo': { tolerance: 1.0, minLength: 1.0, minDistance: 0.2 },
+    'signature': { tolerance: 0.3, minLength: 0.2, minDistance: 0.05 },
+    'fine-art': { tolerance: 0.1, minLength: 0.1, minDistance: 0.02 },
+    'outline': { tolerance: 1.5, minLength: 2.0, minDistance: 0.3 }
+  };
+
+  if (presets[mode]) {
+    const p = presets[mode];
+    document.getElementById('simplify-tolerance').value = p.tolerance;
+    document.getElementById('min-path-length').value = p.minLength;
+    document.getElementById('min-point-distance').value = p.minDistance;
+  }
+}
+
+function updateParameters() {
+  const params = {
+    simplify_tolerance: parseFloat(document.getElementById('simplify-tolerance').value),
+    min_path_length: parseFloat(document.getElementById('min-path-length').value),
+    min_point_distance: parseFloat(document.getElementById('min-point-distance').value)
+  };
+
+  console.log('Parameters updated:', params);
+  alert('Parameters applied (on next processing)');
+}
+
+function updateStatsDisplay(data) {
+  document.getElementById('stat-path-count').textContent = data.path_count || 0;
+  document.getElementById('stat-point-count').textContent = data.total_points || 0;
+  document.getElementById('stat-length').textContent = Math.round(data.total_length_mm * 10) / 10;
+  document.getElementById('stat-closed').textContent = data.has_closed_paths ? 'Yes' : 'No';
+  document.getElementById('stat-open').textContent = data.has_open_paths ? 'Yes' : 'No';
+  
+  // Calculate reduction percentage
+  const originalPoints = data.paths ? 
+    data.paths.reduce((sum, p) => sum + (p.original_point_count || p.point_count), 0) : 0;
+  const reduction = originalPoints > 0 ? 
+    Math.round(100 * (1 - data.total_points / originalPoints)) : 0;
+  document.getElementById('stat-reduction').textContent = reduction;
+}
+
+function drawPreview(data) {
+  if (!data.paths || data.paths.length === 0) {
+    document.getElementById('preview-svg').innerHTML = '<text x="200" y="200">No paths to display</text>';
+    return;
+  }
+
+  // Simple SVG drawing (would be enhanced with proper bounds calculation)
+  let svgPaths = [];
+  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A'];
+  
+  data.paths.forEach((path, idx) => {
+    if (path.points && path.points.length > 0) {
+      const color = colors[idx % colors.length];
+      const pointStrs = path.points.map(p => `${p.x},${p.y}`);
+      const d = 'M' + pointStrs[0] + ' L' + pointStrs.slice(1).join(' L');
+      svgPaths.push(`<path d="${d}" stroke="${color}" stroke-width="2" fill="none"/>`);
+    }
+  });
+
+  document.getElementById('preview-svg').innerHTML = '<rect width="400" height="400" fill="white"/>' + svgPaths.join('');
+}
+
+function previewPaths() {
+  alert('Preview feature would show scaled paths on canvas');
+}
+
+function convertToGCode() {
+  fetch('/api/generate-gcode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      safe_margin: 5.0,
+      pen_down_speed: 1.0,
+      optimize: true
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert(`✓ G-Code generated: ${data.data.command_count} commands`);
+      window.generatedGCode = data.data.gcode;
+    } else {
+      alert('✗ Error: ' + data.error);
+    }
+  });
+}
+
+function downloadGCode() {
+  if (!window.generatedGCode) {
+    alert('No G-Code generated yet');
+    return;
+  }
+
+  const content = window.generatedGCode.join('\n');
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `drawing_${Date.now()}.gcode`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>

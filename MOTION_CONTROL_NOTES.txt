@@ -1,0 +1,27 @@
+Integrated motion-control rewrite (first pass)
+===========================================
+
+What changed
+------------
+1. Removed the old Angle+Distance -> shared motor directions approach.
+2. Added a per-motor inverse-kinematics motion plan:
+   current XY -> target XY -> delta cable length for each motor -> steps for M1..M4.
+3. Added synchronized stepping in MotorController so each motor can take a different
+   number of steps during the same move.
+4. Manual move endpoint now uses XY deltas and inverse kinematics, not sector-based angle logic.
+5. Finish execution now forces pen-up and clears stopRequested.
+
+Important calibration needed
+----------------------------
+The values in include/config.h are placeholders and MUST be measured on the real device:
+- MOTOR_ANCHORS[4]
+- MOTOR_STEPS_PER_MM[4]
+- MOTOR_DIRECTION_SIGN[4]
+
+Without calibrating those three items on the real machine, the new logic is only a correct
+software structure, not a guaranteed physically accurate final tuning.
+
+Recommended next step
+---------------------
+Measure the real motor/string anchor locations relative to your drawing coordinate system,
+then tune per-motor steps/mm and direction sign one motor at a time.

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Image → Paths → G-code</title>
+<style>body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0;padding:24px;color:#223}.wrap{max-width:1100px;margin:auto;background:#fff;padding:24px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}h1{margin-top:0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{border:1px solid #dfe5ef;border-radius:14px;padding:16px;background:#fbfcff}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.row>*{flex:1}label{font-size:14px;color:#556}input,select,button,textarea{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #cfd7e6}button{background:#2f6fed;color:#fff;border:none;cursor:pointer;flex:0 0 auto}button.secondary{background:#0f9d58}button.warn{background:#ef6c00}button.ghost{background:#6b7280}svg{width:100%;height:420px;border:1px solid #d8dfeb;background:#fff;border-radius:10px}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{background:#f6f9ff;padding:10px;border-radius:10px}.mono{font-family:ui-monospace,monospace;white-space:pre-wrap;max-height:260px;overflow:auto;background:#0f172a;color:#e5eefc}.full{grid-column:1/-1}.msg{padding:10px;border-radius:10px;background:#eef4ff}textarea{width:100%;min-height:120px}.small{font-size:13px;color:#667}.hidden{display:none}@media (max-width:850px){.grid{grid-template-columns:1fr}}</style></head>
+<body><div class="wrap">
+<h1>دمج شغل محمد + فتحي</h1><div class="small">الصورة → مسارات نظيفة → G-code → رفع إلى ESP32</div>
+<div class="grid">
+<div class="card">
+<h3>1) معالجة الصورة</h3>
+<div class="row"><input type="file" id="image" accept="image/*"><select id="preset"><option value="">افتراضي</option><option value="logo">Logo</option><option value="signature">Signature</option><option value="outline">Outline</option><option value="fine-art">Fine Art</option></select></div>
+<div class="row">
+<div><label>Threshold</label><input id="threshold" type="number" value="127"></div>
+<div><label>Simplify</label><input id="simplify" type="number" step="0.1" value="0.8"></div>
+<div><label>Min path mm</label><input id="minlen" type="number" step="0.1" value="1.0"></div>
+<div><label>Min area px</label><input id="minarea" type="number" step="1" value="8"></div>
+</div>
+<div class="row">
+<div><label>Workspace W mm</label><input id="ww" type="number" value="200"></div>
+<div><label>Workspace H mm</label><input id="wh" type="number" value="200"></div>
+<div><label>Processing px</label><input id="pw" type="number" value="512"></div>
+<div><label>Invert</label><select id="invert"><option value="true">true</option><option value="false">false</option></select></div>
+</div>
+<div class="row"><button id="processBtn">معالجة الصورة</button><button class="ghost" id="validateBtn">فحص المسارات</button></div>
+<div id="message" class="msg">جاهز.</div>
+<div class="stats" id="stats"></div>
+</div>
+<div class="card">
+<h3>2) Preview</h3>
+<svg id="preview" viewBox="0 0 400 400"><rect width="400" height="400" fill="white"/><text x="200" y="200" text-anchor="middle" fill="#999">لا يوجد Preview بعد</text></svg>
+</div>
+<div class="card full">
+<h3>3) توليد G-code</h3>
+<div class="row">
+<div><label>Safe margin</label><input id="margin" type="number" step="0.5" value="5"></div>
+<div><label>Max commands</label><input id="maxcmd" type="number" value="8000"></div>
+<div><label>ESP URL</label><input id="esp" type="text" placeholder="http://192.168.4.1"></div>
+</div>
+<div class="row"><button class="secondary" id="gcodeBtn">توليد G-code</button><button class="warn" id="uploadBtn">رفع فقط إلى ESP</button><button id="runBtn">رفع وتشغيل</button><button class="ghost" id="downloadBtn">تنزيل G-code</button></div>
+<div id="gstats" class="stats"></div>
+<textarea id="gcodeText" class="mono" readonly></textarea>
+</div>
+</div></div>
+<script>
+let lastPreview=null,lastGcode=[];
+function setMsg(t){document.getElementById('message').textContent=t;}
+function formData(){const fd=new FormData();const f=document.getElementById('image').files[0];if(!f) throw new Error('اختر صورة أولا');fd.append('image',f);const fields={preset:'preset',threshold_value:'threshold',simplify_tolerance:'simplify',min_path_length:'minlen',min_area_px:'minarea',workspace_width_mm:'ww',workspace_height_mm:'wh',processing_width_px:'pw',invert:'invert'};for(const [k,id] of Object.entries(fields)){fd.append(k,document.getElementById(id).value)} return fd;}
+async function processImage(){try{setMsg('جارٍ المعالجة...');const res=await fetch('/api/process-image',{method:'POST',body:formData()});const data=await res.json();if(!data.success) throw new Error(data.error||'Processing failed'); renderStats(data.data); await loadPreview(); setMsg(data.message);}catch(e){setMsg('خطأ: '+e.message)}}
+async function loadPreview(){const res=await fetch('/api/preview');const data=await res.json();if(!data.success) throw new Error(data.error);lastPreview=data.data;renderPreview(data.data);}
+function renderStats(d){const s=document.getElementById('stats');s.innerHTML='';const items=[['عدد المسارات',d.path_count],['عدد النقاط',d.total_points],['الطول الكلي (mm)',d.total_length_mm],['المرفوض',d.rejected_contours],['حدود X',`${d.bounds.minX} → ${d.bounds.maxX}`],['حدود Y',`${d.bounds.minY} → ${d.bounds.maxY}`]];for(const [k,v] of items){const el=document.createElement('div');el.className='stat';el.innerHTML=`<strong>${k}</strong><div>${v}</div>`;s.appendChild(el);}}
+function renderPreview(d){const svg=document.getElementById('preview');const bounds=d.bounds;const minX=bounds.minX,maxX=bounds.maxX,minY=bounds.minY,maxY=bounds.maxY;const w=Math.max(maxX-minX,1),h=Math.max(maxY-minY,1),pad=20,scale=Math.min((400-2*pad)/w,(400-2*pad)/h);let out=`<rect width="400" height="400" fill="white"/>`;(d.svg_paths||[]).forEach((p,i)=>{const color=['#2563eb','#0f9d58','#ef6c00','#d81b60'][i%4];const pts=[];const tokens=p.d.split(/[MLZ ]+/).filter(Boolean);tokens.forEach(tok=>{const [x,y]=tok.split(',').map(Number);if(!isNaN(x)&&!isNaN(y)){const sx=pad+(x-minX)*scale;const sy=400-(pad+(y-minY)*scale);pts.push([sx,sy])}});if(!pts.length) return;let dstr=`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;for(let i=1;i<pts.length;i++) dstr+=` L${pts[i][0].toFixed(1)},${pts[i][1].toFixed(1)}`;if(p.closed) dstr+=' Z';out+=`<path d="${dstr}" stroke="${color}" stroke-width="1.6" fill="none"/>`;out+=`<circle cx="${pts[0][0]}" cy="${pts[0][1]}" r="3" fill="green"/>`;out+=`<circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="2.5" fill="red"/>`;});svg.innerHTML=out;}
+async function validatePaths(){const res=await fetch('/api/validate-paths');const data=await res.json();if(!data.success) return setMsg(data.error);setMsg(data.data.has_issues?('تحذيرات: '+data.data.issues.join(' | ')):'المسارات سليمة');}
+async function genGcode(){const payload={safe_margin:parseFloat(document.getElementById('margin').value),max_commands:parseInt(document.getElementById('maxcmd').value,10),optimize:true,min_point_distance_mm:0.25,min_path_length:parseFloat(document.getElementById('minlen').value)};const res=await fetch('/api/generate-gcode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await res.json();if(!data.success){setMsg('خطأ: '+data.error);return;}lastGcode=data.data.gcode;document.getElementById('gcodeText').value=lastGcode.join('\n');const gs=document.getElementById('gstats');gs.innerHTML='';Object.entries(data.data.stats).forEach(([k,v])=>{const el=document.createElement('div');el.className='stat';el.innerHTML=`<strong>${k}</strong><div>${v}</div>`;gs.appendChild(el);});setMsg(data.message);}
+async function upload(autoExecute){if(!lastGcode.length) return setMsg('ولّد G-code أولاً');const esp=document.getElementById('esp').value.trim();if(!esp) return setMsg('اكتب ESP URL');const res=await fetch('/api/upload-to-esp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({esp_url:esp,gcode:lastGcode,auto_execute:autoExecute})});const data=await res.json();setMsg(data.success?((data.message||'تم الرفع')+(data.execute_message?(' | '+data.execute_message):'')):('خطأ: '+data.error));}
+function downloadGcode(){if(!lastGcode.length) return setMsg('لا يوجد G-code');const blob=new Blob([lastGcode.join('\n')],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='generated_paths.gcode';a.click();URL.revokeObjectURL(a.href);}
+document.getElementById('processBtn').onclick=processImage;document.getElementById('validateBtn').onclick=validatePaths;document.getElementById('gcodeBtn').onclick=genGcode;document.getElementById('uploadBtn').onclick=()=>upload(false);document.getElementById('runBtn').onclick=()=>upload(true);document.getElementById('downloadBtn').onclick=downloadGcode;
+</script></body></html>
