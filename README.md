@@ -37,7 +37,6 @@ The project combines:
 - [Roadmap](#roadmap)
 - [Documentation](#documentation)
 - [Demo](#demo)
-- [Team](#team)
 - [License](#license)
 
 ---
@@ -252,7 +251,9 @@ fixed_project/
 ├── web/
 │   └── index.html
 └── __pycache__/
-## Structure Notes
+```
+
+### Structure Notes
 
 The repository is organized into clear functional layers:
 
@@ -354,131 +355,164 @@ Depending on deployment mode, the ESP32 side may also expose routes for:
 ### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
-2. Run integration tests
+```
+
+### 2. Run integration tests
+```bash
 python3 test_integration.py
-3. Start the local processing server
+```
+
+### 3. Start the local processing server
+```bash
 python bridge_server.py
+```
 
 Then open:
 
+```text
 http://127.0.0.1:8080
+```
 
 From there you can:
 
-upload an image
-preview extracted paths
-generate G-code
-send G-code to the ESP32
-Firmware Workflow
-Build
+- upload an image
+- preview extracted paths
+- generate G-code
+- send G-code to the ESP32
 
+---
+
+## Firmware Workflow
+
+### Build
 Use your ESP32 / PlatformIO workflow to build the firmware.
 
-Upload
-
+### Upload
 Flash the firmware to the ESP32, then connect to the device-side control interface.
 
-Execute
-
+### Execute
 During execution, the firmware:
 
-parses the G-code queue
-prepares scaling and transform data
-checks workspace bounds
-calculates motion
-executes synchronized stepping
-updates robot state
+1. parses the G-code queue  
+2. prepares scaling and transform data  
+3. checks workspace bounds  
+4. calculates motion  
+5. executes synchronized stepping  
+6. updates robot state  
 
-The firmware side is intended for motion execution, not heavy image processing.
+> The firmware side is intended for **motion execution**, not heavy image processing.
 
-Testing
+---
+
+## Testing
 
 The project includes:
 
-core algorithm verification
-integration testing
-hardware test procedures
-preview-vs-output validation workflows
-Recommended validation order
-Straight line
-Square
-Circle
-Signature / outline
-Real image-to-drawing comparison
+- core algorithm verification
+- integration testing
+- hardware test procedures
+- preview-vs-output validation workflows
+
+### Recommended validation order
+
+1. Straight line  
+2. Square  
+3. Circle  
+4. Signature / outline  
+5. Real image-to-drawing comparison  
 
 This staged order helps isolate calibration and motion issues early.
 
-Technical Highlights
-Image Processing
+---
 
+## Technical Highlights
+
+### Image Processing
 The image-processing pipeline includes:
 
-preprocessing
-contour detection
-simplification
-duplicate removal
-validation
-JSON serialization
-G-code Validation
+- preprocessing
+- contour detection
+- simplification
+- duplicate removal
+- validation
+- JSON serialization
 
+### G-code Validation
 The validation layer includes:
 
-path validation
-point cleanup
-bounds checking
-fit transform calculation
-command optimization
-Major Fix
+- path validation
+- point cleanup
+- bounds checking
+- fit transform calculation
+- command optimization
 
-One of the major fixes in the project was replacing a hardcoded scaling factor of 1.0 with proper dynamic scaling and transform calculation inside the executor.
+### Major Fix
+One of the major fixes in the project was replacing a hardcoded scaling factor of `1.0` with proper dynamic scaling and transform calculation inside the executor.
 
-Motion Model
-
+### Motion Model
 The motion logic follows this sequence:
 
-target (X, Y)
-inverse kinematics
-cable-length computation
-per-motor step calculation
-synchronized stepping for accurate drawing
-Known Limitations
+- target `(X, Y)`
+- inverse kinematics
+- cable-length computation
+- per-motor step calculation
+- synchronized stepping for accurate drawing
+
+---
+
+## Known Limitations
 
 Current limitations include:
 
-dependency on OpenCV / NumPy
-point-count limits for large drawings
-ESP32 memory / command limits
-execution time constraints on complex paths
-real-world precision affected by cable elasticity
-Roadmap
-Short Term
-run full robot tests
-verify motor synchronization
-validate drawing accuracy
-benchmark performance
-test with real images
-Medium Term
-improve smoothing
-add centerline support for thick strokes
-improve UI/UX
-add simulation features
-Long Term
-Bézier smoothing
-multi-layer drawing
-drawing library support
-more advanced preview and execution simulation
-Documentation
-USER_GUIDE.md — end-user instructions
-TECHNICAL_DOCUMENTATION.md — architecture, APIs, and algorithms
-IMPLEMENTATION_SUMMARY.md — implementation details
-FINAL_REPORT.md — completion report and metrics
-PROJECT_DELIVERY_CHECKLIST.md — requirement-by-requirement verification
-START_HERE.txt — quick project entry point
-FINAL_INTEGRATED_README.md — integrated project notes
-Demo
+- dependency on OpenCV / NumPy
+- point-count limits for large drawings
+- ESP32 memory / command limits
+- execution time constraints on complex paths
+- real-world precision affected by cable elasticity
+
+---
+
+## Roadmap
+
+### Short Term
+- run full robot tests
+- verify motor synchronization
+- validate drawing accuracy
+- benchmark performance
+- test with real images
+
+### Medium Term
+- improve smoothing
+- add centerline support for thick strokes
+- improve UI/UX
+- add simulation features
+
+### Long Term
+- Bézier smoothing
+- multi-layer drawing
+- drawing library support
+- more advanced preview and execution simulation
+
+---
+
+## Documentation
+
+- `USER_GUIDE.md` — end-user instructions
+- `TECHNICAL_DOCUMENTATION.md` — architecture, APIs, and algorithms
+- `IMPLEMENTATION_SUMMARY.md` — implementation details
+- `FINAL_REPORT.md` — completion report and metrics
+- `PROJECT_DELIVERY_CHECKLIST.md` — requirement-by-requirement verification
+- `START_HERE.txt` — quick project entry point
+- `FINAL_INTEGRATED_README.md` — integrated project notes
+
+---
+
+## Demo
 
 Screenshots, demo images, and drawing videos will be added soon.
 
-License
+---
+
+## License
 
 This project is currently intended for educational, prototype, and research use.
