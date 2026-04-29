@@ -252,3 +252,233 @@ fixed_project/
 ├── web/
 │   └── index.html
 └── __pycache__/
+## Structure Notes
+
+The repository is organized into clear functional layers:
+
+- `image_processor.py`, `path_optimizer.py`, `web_handlers.py`, and `gcode_exporter.py` form the main **processing and generation pipeline**
+- `include/` contains **firmware headers, shared interfaces, and configuration**
+- `src/` contains the **firmware-side implementation**
+- `web/` contains the **browser-based UI**
+- Root-level `.md` and `.txt` files contain **reports, summaries, checklists, and delivery notes**
+
+The following directories are mainly development or generated artifacts and are not part of the core runtime logic:
+
+- `.pio/`
+- `__pycache__/`
+- `.idea/`
+- `.vscode/`
+
+---
+
+## Coordinate System
+
+The project uses a documented 2D drawing coordinate system:
+
+- **Origin:** top-left corner `(0, 0)`
+- **X-axis:** increases from left to right
+- **Y-axis:** increases from top to bottom
+- **Units:** millimeters
+- **Workspace:** `200 × 200 mm`
+- **Safe drawing area:** approximately `160 × 160 mm`
+- **Precision:** up to 3 decimal places
+
+This coordinate model is shared across the full pipeline, including:
+
+- image processing
+- path validation
+- G-code generation
+- execution logic
+
+---
+
+## Data Model
+
+The pipeline uses a shared contract between processing and execution.
+
+### `Point`
+Represents a single `(x, y)` coordinate in workspace millimeters.
+
+### `VectorPath`
+Represents one extracted path, including:
+
+- a list of points
+- closed / open state
+- path length
+- simplification metadata
+
+### `PathExtractionResult`
+Represents the full processed output, including:
+
+- all extracted paths
+- total length
+- total point count
+- drawing bounds
+- processing metadata
+
+### `GCodeCommand`
+Represents one parsed firmware-side drawing instruction.
+
+---
+
+## API Endpoints
+
+The processing side exposes the following endpoints:
+
+### `POST /api/process-image`
+Processes an uploaded image and returns extracted paths with statistics.
+
+### `POST /api/generate-gcode`
+Generates validated and optimized G-code from processed paths.
+
+### `POST /api/validate-paths`
+Checks processed paths and reports validation issues.
+
+### `GET /api/preview`
+Returns browser-friendly preview data for visualization.
+
+### Firmware-side routes
+Depending on deployment mode, the ESP32 side may also expose routes for:
+
+- upload
+- execute
+- clear
+- status
+- progress
+- manual control
+
+---
+
+## Quick Start
+
+### 1. Install dependencies
+```bash
+pip install -r requirements.txt
+2. Run integration tests
+python3 test_integration.py
+3. Start the local processing server
+python bridge_server.py
+
+Then open:
+
+http://127.0.0.1:8080
+
+From there you can:
+
+upload an image
+preview extracted paths
+generate G-code
+send G-code to the ESP32
+Firmware Workflow
+Build
+
+Use your ESP32 / PlatformIO workflow to build the firmware.
+
+Upload
+
+Flash the firmware to the ESP32, then connect to the device-side control interface.
+
+Execute
+
+During execution, the firmware:
+
+parses the G-code queue
+prepares scaling and transform data
+checks workspace bounds
+calculates motion
+executes synchronized stepping
+updates robot state
+
+The firmware side is intended for motion execution, not heavy image processing.
+
+Testing
+
+The project includes:
+
+core algorithm verification
+integration testing
+hardware test procedures
+preview-vs-output validation workflows
+Recommended validation order
+Straight line
+Square
+Circle
+Signature / outline
+Real image-to-drawing comparison
+
+This staged order helps isolate calibration and motion issues early.
+
+Technical Highlights
+Image Processing
+
+The image-processing pipeline includes:
+
+preprocessing
+contour detection
+simplification
+duplicate removal
+validation
+JSON serialization
+G-code Validation
+
+The validation layer includes:
+
+path validation
+point cleanup
+bounds checking
+fit transform calculation
+command optimization
+Major Fix
+
+One of the major fixes in the project was replacing a hardcoded scaling factor of 1.0 with proper dynamic scaling and transform calculation inside the executor.
+
+Motion Model
+
+The motion logic follows this sequence:
+
+target (X, Y)
+inverse kinematics
+cable-length computation
+per-motor step calculation
+synchronized stepping for accurate drawing
+Known Limitations
+
+Current limitations include:
+
+dependency on OpenCV / NumPy
+point-count limits for large drawings
+ESP32 memory / command limits
+execution time constraints on complex paths
+real-world precision affected by cable elasticity
+Roadmap
+Short Term
+run full robot tests
+verify motor synchronization
+validate drawing accuracy
+benchmark performance
+test with real images
+Medium Term
+improve smoothing
+add centerline support for thick strokes
+improve UI/UX
+add simulation features
+Long Term
+Bézier smoothing
+multi-layer drawing
+drawing library support
+more advanced preview and execution simulation
+Documentation
+USER_GUIDE.md — end-user instructions
+TECHNICAL_DOCUMENTATION.md — architecture, APIs, and algorithms
+IMPLEMENTATION_SUMMARY.md — implementation details
+FINAL_REPORT.md — completion report and metrics
+PROJECT_DELIVERY_CHECKLIST.md — requirement-by-requirement verification
+START_HERE.txt — quick project entry point
+FINAL_INTEGRATED_README.md — integrated project notes
+Demo
+
+Screenshots, demo images, and drawing videos will be added soon.
+
+License
+
+This project is currently intended for educational, prototype, and research use.
